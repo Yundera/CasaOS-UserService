@@ -14,7 +14,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -652,15 +651,8 @@ func GetUserImage(ctx echo.Context) error {
 	if !file.Exists(absFilePath) {
 		return ctx.JSON(http.StatusNotFound, model.Result{Success: common_err.FILE_DOES_NOT_EXIST, Message: common_err.GetMsg(common_err.FILE_DOES_NOT_EXIST)})
 	}
-	if !strings.Contains(absFilePath, config.AppInfo.UserDataPath) {
-		return ctx.JSON(http.StatusNotFound, model.Result{Success: common_err.INSUFFICIENT_PERMISSIONS, Message: common_err.GetMsg(common_err.INSUFFICIENT_PERMISSIONS)})
-	}
 
-	matched, err := regexp.MatchString(`^/var/lib/casaos/\d`, absFilePath)
-	if err != nil {
-		return ctx.JSON(http.StatusNotFound, model.Result{Success: common_err.INSUFFICIENT_PERMISSIONS, Message: common_err.GetMsg(common_err.INSUFFICIENT_PERMISSIONS)})
-	}
-	if !matched {
+	if !strings.Contains(absFilePath, config.AppInfo.UserDataPath) {
 		return ctx.JSON(http.StatusNotFound, model.Result{Success: common_err.INSUFFICIENT_PERMISSIONS, Message: common_err.GetMsg(common_err.INSUFFICIENT_PERMISSIONS)})
 	}
 
