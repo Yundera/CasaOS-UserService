@@ -14,6 +14,7 @@ type Repository interface {
 	User() UserService
 	MessageBus() *message_bus.ClientWithResponses
 	Event() EventService
+	AuthToken() AuthTokenService
 }
 
 func NewService(db *gorm.DB, RuntimePath string) Repository {
@@ -24,16 +25,18 @@ func NewService(db *gorm.DB, RuntimePath string) Repository {
 	}
 
 	return &store{
-		gateway: gatewayManagement,
-		user:    NewUserService(db),
-		event:   NewEventService(db),
+		gateway:   gatewayManagement,
+		user:      NewUserService(db),
+		event:     NewEventService(db),
+		authToken: NewAuthTokenService(db),
 	}
 }
 
 type store struct {
-	gateway external.ManagementService
-	user    UserService
-	event   EventService
+	gateway   external.ManagementService
+	user      UserService
+	event     EventService
+	authToken AuthTokenService
 }
 
 func (c *store) Event() EventService {
@@ -46,6 +49,11 @@ func (c *store) Gateway() external.ManagementService {
 func (c *store) User() UserService {
 	return c.user
 }
+
+func (c *store) AuthToken() AuthTokenService {
+	return c.authToken
+}
+
 func (c *store) MessageBus() *message_bus.ClientWithResponses {
 	client, _ := message_bus.NewClientWithResponses("", func(c *message_bus.Client) error {
 		// error will never be returned, as we always want to return a client, even with wrong address,

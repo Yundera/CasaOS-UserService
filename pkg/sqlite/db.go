@@ -41,7 +41,7 @@ func GetDb(dbPath string) *gorm.DB {
 
 	gdb = db
 
-	err = db.AutoMigrate(model2.UserDBModel{}, model.EventModel{})
+	err = db.AutoMigrate(model2.UserDBModel{}, model.EventModel{}, model2.AuthTokenModel{})
 	if err != nil {
 		logger.Error("check or create db error", zap.Any("error", err))
 	}
