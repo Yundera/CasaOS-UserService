@@ -80,8 +80,6 @@ func PostMagicLinkRequest(ctx echo.Context) error {
 	go func() {
 		if err := sendEmailViaSMTP(userEmail, subject, htmlBody, textBody); err != nil {
 			logger.Error("Failed to send magic link email", zap.Error(err))
-		} else {
-			logger.Info("Magic link sent successfully", zap.Int("token_id", authToken.ID), zap.String("email", userEmail))
 		}
 	}()
 
@@ -231,8 +229,6 @@ func PostPasswordResetRequest(ctx echo.Context) error {
 	go func() {
 		if err := sendEmailViaSMTP(userEmail, subject, htmlBody, textBody); err != nil {
 			logger.Error("Failed to send password reset email", zap.Error(err))
-		} else {
-			logger.Info("Password reset email sent successfully", zap.Int("token_id", authToken.ID), zap.String("email", userEmail))
 		}
 	}()
 
@@ -358,10 +354,30 @@ func PostPasswordResetConfirm(ctx echo.Context) error {
 		model.Result{Success: common_err.SUCCESS, Message: "Password reset successfully"})
 }
 
+// unencryptedAuth allows SMTP authentication over unencrypted connections
+// This is needed because our internal SMTP relay doesn't use TLS
+type unencryptedAuth struct {
+	username, password string
+}
+
+func (a unencryptedAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	return "PLAIN", []byte("\x00" + a.username + "\x00" + a.password), nil
+}
+
+func (a unencryptedAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if more {
+		return nil, fmt.Errorf("unexpected server challenge")
+	}
+	return nil, nil
+}
+
 // sendEmailViaSMTP sends an email via the local SMTP relay
 func sendEmailViaSMTP(to, subject, htmlBody, textBody string) error {
 	// Get SMTP configuration
-	smtpHost := "127.0.0.1"
+	smtpHost := os.Getenv("SMTP_HOST")
+	if smtpHost == "" {
+		smtpHost = "smtp"  // Default to 'smtp' container hostname on pcs network
+	}
 	smtpPort := os.Getenv("SMTP_PORT")
 	if smtpPort == "" {
 		smtpPort = "587"
@@ -400,38 +416,48 @@ func sendEmailViaSMTP(to, subject, htmlBody, textBody string) error {
 	smtpAddr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
 	client, err := smtp.Dial(smtpAddr)
 	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		logger.Error("Failed to connect to SMTP server", zap.String("address", smtpAddr), zap.Error(err))
+		return fmt.Errorf("failed to connect to SMTP server %s: %w", smtpAddr, err)
 	}
 	defer client.Close()
 
-	// Authenticate
-	auth := smtp.PlainAuth("", smtpUsername, smtpPassword, smtpHost)
+	// Authenticate using custom auth that allows unencrypted connections for internal SMTP relay
+	auth := unencryptedAuth{
+		username: smtpUsername,
+		password: smtpPassword,
+	}
 	if err = client.Auth(auth); err != nil {
+		logger.Error("SMTP authentication failed", zap.Error(err))
 		return fmt.Errorf("SMTP authentication failed: %w", err)
 	}
 
 	// Set sender and recipient
 	if err = client.Mail(from); err != nil {
+		logger.Error("Failed to set sender", zap.Error(err))
 		return fmt.Errorf("failed to set sender: %w", err)
 	}
 
 	if err = client.Rcpt(to); err != nil {
+		logger.Error("Failed to set recipient", zap.Error(err))
 		return fmt.Errorf("failed to set recipient: %w", err)
 	}
 
 	// Send message
 	w, err := client.Data()
 	if err != nil {
+		logger.Error("Failed to send email data", zap.Error(err))
 		return fmt.Errorf("failed to send email data: %w", err)
 	}
 
 	_, err = w.Write(message)
 	if err != nil {
+		logger.Error("Failed to write email", zap.Error(err))
 		return fmt.Errorf("failed to write email: %w", err)
 	}
 
 	err = w.Close()
 	if err != nil {
+		logger.Error("Failed to send email", zap.Error(err))
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
