@@ -60,7 +60,7 @@ func PostMagicLinkRequest(ctx echo.Context) error {
 	}
 
 	// Create auth token
-	authToken, plaintextToken, plaintextCode, err := service.MyService.AuthToken().CreateAuthToken(
+	_, plaintextToken, plaintextCode, err := service.MyService.AuthToken().CreateAuthToken(
 		user.Id, userEmail, service.TokenTypeMagicLink, clientIP)
 	if err != nil {
 		logger.Error("Failed to create magic link token", zap.Error(err))
@@ -209,7 +209,7 @@ func PostPasswordResetRequest(ctx echo.Context) error {
 	}
 
 	// Create auth token
-	authToken, plaintextToken, plaintextCode, err := service.MyService.AuthToken().CreateAuthToken(
+	_, plaintextToken, plaintextCode, err := service.MyService.AuthToken().CreateAuthToken(
 		user.Id, userEmail, service.TokenTypePasswordReset, clientIP)
 	if err != nil {
 		logger.Error("Failed to create password reset token", zap.Error(err))
