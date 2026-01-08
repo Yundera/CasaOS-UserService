@@ -74,11 +74,11 @@ func PostMagicLinkRequest(ctx echo.Context) error {
 	magicLink := fmt.Sprintf("%s://%s/#/auth/magic?token=%s", protocol, host, plaintextToken)
 
 	// Generate email content
-	subject, htmlBody, textBody := email.GenerateMagicLinkEmail(plaintextCode, magicLink)
+	emailContent := email.GenerateMagicLinkEmail(plaintextCode, magicLink)
 
 	// Send email asynchronously (don't make user wait for SMTP)
 	go func() {
-		if err := sendEmailViaSMTP(userEmail, subject, htmlBody, textBody); err != nil {
+		if err := sendEmailViaSMTP(userEmail, emailContent); err != nil {
 			logger.Error("Failed to send magic link email", zap.Error(err))
 		}
 	}()
@@ -223,11 +223,11 @@ func PostPasswordResetRequest(ctx echo.Context) error {
 	resetLink := fmt.Sprintf("%s://%s/#/auth/password-reset?token=%s", protocol, host, plaintextToken)
 
 	// Generate email content
-	subject, htmlBody, textBody := email.GeneratePasswordResetEmail(plaintextCode, resetLink)
+	emailContent := email.GeneratePasswordResetEmail(plaintextCode, resetLink)
 
 	// Send email asynchronously (don't make user wait for SMTP)
 	go func() {
-		if err := sendEmailViaSMTP(userEmail, subject, htmlBody, textBody); err != nil {
+		if err := sendEmailViaSMTP(userEmail, emailContent); err != nil {
 			logger.Error("Failed to send password reset email", zap.Error(err))
 		}
 	}()
@@ -371,12 +371,12 @@ func (a unencryptedAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 	return nil, nil
 }
 
-// sendEmailViaSMTP sends an email via the local SMTP relay
-func sendEmailViaSMTP(to, subject, htmlBody, textBody string) error {
+// sendEmailViaSMTP sends an email via the local SMTP relay using the email builder
+func sendEmailViaSMTP(to string, content email.EmailContent) error {
 	// Get SMTP configuration
 	smtpHost := os.Getenv("SMTP_HOST")
 	if smtpHost == "" {
-		smtpHost = "smtp"  // Default to 'smtp' container hostname on pcs network
+		smtpHost = "smtp" // Default to 'smtp' container hostname on pcs network
 	}
 	smtpPort := os.Getenv("SMTP_PORT")
 	if smtpPort == "" {
@@ -392,25 +392,13 @@ func sendEmailViaSMTP(to, subject, htmlBody, textBody string) error {
 		smtpPassword = "localpassword"
 	}
 
-	// Build email message in RFC 5322 format
+	// Build email message using the email builder (handles MIME with attachments)
 	from := "auth@localhost"
-	message := []byte(
-		"From: " + from + "\r\n" +
-			"To: " + to + "\r\n" +
-			"Subject: " + subject + "\r\n" +
-			"MIME-Version: 1.0\r\n" +
-			"Content-Type: multipart/alternative; boundary=\"boundary123\"\r\n" +
-			"\r\n" +
-			"--boundary123\r\n" +
-			"Content-Type: text/plain; charset=UTF-8\r\n" +
-			"\r\n" +
-			textBody + "\r\n" +
-			"--boundary123\r\n" +
-			"Content-Type: text/html; charset=UTF-8\r\n" +
-			"\r\n" +
-			htmlBody + "\r\n" +
-			"--boundary123--\r\n",
-	)
+	message, err := email.BuildMIMEEmail(from, to, content)
+	if err != nil {
+		logger.Error("Failed to build email", zap.Error(err))
+		return fmt.Errorf("failed to build email: %w", err)
+	}
 
 	// Connect to SMTP server
 	smtpAddr := fmt.Sprintf("%s:%s", smtpHost, smtpPort)
