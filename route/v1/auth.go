@@ -42,7 +42,7 @@ func PostMagicLinkRequest(ctx echo.Context) error {
 	}
 
 	// Find user by email
-	user := service.MyService.User().GetUserAllInfoByName(userEmail)
+	user := service.MyService.User().GetUserAllInfoByEmail(userEmail)
 	if user.Id == 0 {
 		// Email not found - wait 2 seconds to prevent timing attacks
 		time.Sleep(2 * time.Second)
@@ -191,7 +191,7 @@ func PostPasswordResetRequest(ctx echo.Context) error {
 	}
 
 	// Find user by email
-	user := service.MyService.User().GetUserAllInfoByName(userEmail)
+	user := service.MyService.User().GetUserAllInfoByEmail(userEmail)
 	if user.Id == 0 {
 		// Email not found - wait 2 seconds to prevent timing attacks
 		time.Sleep(2 * time.Second)
@@ -332,7 +332,7 @@ func PostPasswordResetConfirm(ctx echo.Context) error {
 	}
 
 	// Find user by email
-	user := service.MyService.User().GetUserAllInfoByName(emailFromJSON)
+	user := service.MyService.User().GetUserAllInfoByEmail(emailFromJSON)
 	if user.Id == 0 {
 		return ctx.JSON(common_err.SERVICE_ERROR,
 			model.Result{Success: common_err.USER_NOT_EXIST, Message: "User not found"})
