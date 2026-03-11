@@ -41,8 +41,8 @@ func PostMagicLinkRequest(ctx echo.Context) error {
 			model.Result{Success: common_err.INVALID_PARAMS, Message: "Invalid email address"})
 	}
 
-	// Find user by email
-	user := service.MyService.User().GetUserAllInfoByEmail(userEmail)
+	// Find user by email (reads from .ynd.user.env)
+	user := getUserByEmail(userEmail)
 	if user.Id == 0 {
 		// Email not found - wait 2 seconds to prevent timing attacks
 		time.Sleep(2 * time.Second)
@@ -69,9 +69,8 @@ func PostMagicLinkRequest(ctx echo.Context) error {
 	}
 
 	// Build magic link URL
-	protocol := ctx.Scheme()
-	host := ctx.Request().Host
-	magicLink := fmt.Sprintf("%s://%s/#/auth/magic?token=%s", protocol, host, plaintextToken)
+	baseURL := getBaseURL(ctx)
+	magicLink := fmt.Sprintf("%s/#/auth/magic?token=%s", baseURL, plaintextToken)
 
 	// Generate email content
 	emailContent := email.GenerateMagicLinkEmail(plaintextCode, magicLink)
@@ -190,8 +189,8 @@ func PostPasswordResetRequest(ctx echo.Context) error {
 			model.Result{Success: common_err.INVALID_PARAMS, Message: "Invalid email address"})
 	}
 
-	// Find user by email
-	user := service.MyService.User().GetUserAllInfoByEmail(userEmail)
+	// Find user by email (reads from .ynd.user.env)
+	user := getUserByEmail(userEmail)
 	if user.Id == 0 {
 		// Email not found - wait 2 seconds to prevent timing attacks
 		time.Sleep(2 * time.Second)
@@ -218,9 +217,8 @@ func PostPasswordResetRequest(ctx echo.Context) error {
 	}
 
 	// Build password reset URL
-	protocol := ctx.Scheme()
-	host := ctx.Request().Host
-	resetLink := fmt.Sprintf("%s://%s/#/auth/password-reset?token=%s", protocol, host, plaintextToken)
+	baseURL := getBaseURL(ctx)
+	resetLink := fmt.Sprintf("%s/#/auth/password-reset?token=%s", baseURL, plaintextToken)
 
 	// Generate email content
 	emailContent := email.GeneratePasswordResetEmail(plaintextCode, resetLink)
@@ -331,8 +329,8 @@ func PostPasswordResetConfirm(ctx echo.Context) error {
 			model.Result{Success: common_err.INVALID_PARAMS, Message: "Email required for confirmation"})
 	}
 
-	// Find user by email
-	user := service.MyService.User().GetUserAllInfoByEmail(emailFromJSON)
+	// Find user by email (reads from .ynd.user.env)
+	user := getUserByEmail(emailFromJSON)
 	if user.Id == 0 {
 		return ctx.JSON(common_err.SERVICE_ERROR,
 			model.Result{Success: common_err.USER_NOT_EXIST, Message: "User not found"})
@@ -352,6 +350,36 @@ func PostPasswordResetConfirm(ctx echo.Context) error {
 
 	return ctx.JSON(common_err.SUCCESS,
 		model.Result{Success: common_err.SUCCESS, Message: "Password reset successfully"})
+}
+
+// getUserByEmail looks up a user by checking the input email against
+// the YND_USER_EMAIL env var (set by s6 startup script from .ynd.user.env).
+// If it matches, returns the first (only) user on this PCS.
+func getUserByEmail(inputEmail string) model2.UserDBModel {
+	yndEmail := os.Getenv("YND_USER_EMAIL")
+	if yndEmail == "" || !strings.EqualFold(inputEmail, yndEmail) {
+		return model2.UserDBModel{}
+	}
+	// Email matches — return the PCS user (single user system)
+	users := service.MyService.User().GetAllUserName()
+	if len(users) == 0 {
+		return model2.UserDBModel{}
+	}
+	return service.MyService.User().GetUserAllInfoByName(users[0].Username)
+}
+
+// getBaseURL returns the base URL for email links using existing PCS env vars.
+// REF_DOMAIN (e.g., "alice.nsl.sh") and REF_SCHEME (e.g., "https") are set
+// in docker-compose.yml from the DOMAIN variable.
+// Falls back to request headers if env vars are not set.
+func getBaseURL(ctx echo.Context) string {
+	domain := os.Getenv("REF_DOMAIN")
+	scheme := os.Getenv("REF_SCHEME")
+	if domain != "" && scheme != "" {
+		return fmt.Sprintf("%s://%s", scheme, domain)
+	}
+	// Fallback: derive from request (may be wrong behind reverse proxies)
+	return fmt.Sprintf("%s://%s", ctx.Scheme(), ctx.Request().Host)
 }
 
 // unencryptedAuth allows SMTP authentication over unencrypted connections

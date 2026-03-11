@@ -31,7 +31,6 @@ type UserService interface {
 	GetUserInfoById(id string) (m model.UserDBModel)
 	GetUserAllInfoById(id string) (m model.UserDBModel)
 	GetUserAllInfoByName(userName string) (m model.UserDBModel)
-	GetUserAllInfoByEmail(email string) (m model.UserDBModel)
 	DeleteUserById(id string)
 	DeleteAllUser()
 	GetUserInfoByUserName(userName string) (m model.UserDBModel)
@@ -90,10 +89,6 @@ func (u *userService) GetUserAllInfoByName(userName string) (m model.UserDBModel
 	return
 }
 
-func (u *userService) GetUserAllInfoByEmail(email string) (m model.UserDBModel) {
-	u.db.Where("email= ?", email).First(&m)
-	return
-}
 
 func (u *userService) GetUserInfoById(id string) (m model.UserDBModel) {
 	u.db.Select("username", "id", "role", "nickname", "description", "avatar", "email").Where("id= ?", id).First(&m)
