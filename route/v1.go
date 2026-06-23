@@ -37,12 +37,9 @@ func InitRouter() http.Handler {
 
 	e.GET("/v1/users/status", v1.GetUserStatus) // init/check
 
-	// Auth routes (no auth required - these are for login/password reset)
+	// Auth routes (no auth required - passwordless magic-link sign-in)
 	e.POST("/v1/auth/magic-link/request", v1.PostMagicLinkRequest)
 	e.POST("/v1/auth/magic-link/verify", v1.PostMagicLinkVerify)
-	e.POST("/v1/auth/password-reset/request", v1.PostPasswordResetRequest)
-	e.POST("/v1/auth/password-reset/verify", v1.PostPasswordResetVerify)
-	e.POST("/v1/auth/password-reset/confirm", v1.PostPasswordResetConfirm)
 
 	v1Group := e.Group("/v1")
 

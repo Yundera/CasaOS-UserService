@@ -2,20 +2,16 @@ package email
 
 import (
 	"bytes"
-	"embed"
 	"encoding/base64"
 	"fmt"
 	"time"
 )
 
-//go:embed assets/yundera-logo.png
-var logoFS embed.FS
-
 // InlineAttachment represents an inline image for emails
 type InlineAttachment struct {
 	Content   []byte // Raw binary content
 	MimeType  string // e.g., "image/png"
-	ContentID string // e.g., "yundera_logo" (referenced as cid:yundera_logo in HTML)
+	ContentID string // referenced as cid:<ContentID> in HTML
 	Filename  string // e.g., "logo.png"
 }
 
@@ -26,21 +22,6 @@ type EmailContent struct {
 	HTMLBody    string
 	Attachments []InlineAttachment
 }
-
-// YunderaLogo returns the Yundera logo as an InlineAttachment
-func YunderaLogo() InlineAttachment {
-	content, _ := logoFS.ReadFile("assets/yundera-logo.png")
-	return InlineAttachment{
-		Content:   content,
-		MimeType:  "image/png",
-		ContentID: "yundera_logo",
-		Filename:  "yundera-logo.png",
-	}
-}
-
-// YunderaLogoContentID is the Content-ID reference for the Yundera logo
-// Use this in HTML as: <img src="cid:yundera_logo" />
-const YunderaLogoContentID = "cid:yundera_logo"
 
 // BuildMIMEEmail constructs a proper multipart MIME email with inline attachments
 // Returns the complete email message as bytes ready for SMTP

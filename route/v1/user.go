@@ -759,6 +759,9 @@ func GetUserStatus(ctx echo.Context) error {
 		logger.Error("NvidiaGPUInfoList error", zap.Error(err))
 	}
 	data["gpus"] = len(gpus)
+	// Whether passwordless email sign-in is available (USER_EMAIL + SMTP configured).
+	// The login UI uses this to decide whether to offer the magic-link option.
+	data["email_login_enabled"] = EmailLoginEnabled()
 	return ctx.JSON(common_err.SUCCESS,
 		model.Result{
 			Success: common_err.SUCCESS,
